@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "es5",
+    "module": "commonjs",
+    "lib": ["es2015", "dom"],
+    "strict": true,
+    "skipDefaultLibCheck": true,
+    "skipLibCheck": true,
+    "allowJs": false,
+    "noEmit": false,
+    "newLine": "LF",
+    "declaration": true,
+    "plugins": [
+      {
+        "name": "typescript-tslint-plugin",
+        "alwaysShowRuleFailuresAsWarnings": true
+      }
+    ]
+  },
+  "exclude": ["**/node_modules/*"]
+}

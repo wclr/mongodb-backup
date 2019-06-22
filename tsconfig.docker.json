@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig",
+  "compilerOptions": {
+    "declaration": false,
+    "outDir": "./build"
+  },
+  "exclude": [
+    "test.ts"
+  ]
+}
