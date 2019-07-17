@@ -8,7 +8,8 @@
     "build-image-src": "yarn tsc --p tsconfig.docker.json",
     "docker-build": "docker build -t whitecolor/mongodb-backup:latest .",
     "tag-image": "docker tag whitecolor/mongodb-backup:latest whitecolor/mongodb-backup:1.0.0",
-    "build-image": "yarn build-image-src && yarn docker-build && yarn tag-image"
+    "build-full": "yarn build-image-src && yarn docker-build && yarn tag-image",
+    "push-image": "docker push whitecolor/mongodb-backup:1.0.0"
   },
   "prettier": {
     "semi": false,

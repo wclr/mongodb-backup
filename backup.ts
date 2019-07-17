@@ -26,14 +26,20 @@ const zipDir = (source: string, out: string) => {
   })
 }
 
+const joinPath = (parts: (string | undefined)[]) =>
+  parts.filter(_ => !!_).join('/')
+
 const uploadFile = async (filePath: string, uploadConfig: UploadConfig) => {
   const s3 = new aws.S3()
 
   const { bucket, folder = '' } = uploadConfig
   const fileName = basename(filePath)
-  const key = [folder, fileName].filter(_ => !!_).join('/')
+  const key = joinPath([folder, fileName])
   const data = await fs.readFile(filePath)
   console.log(`Uploading ${filePath} to AWS ${bucket}/${key}`)
+  if (!bucket) {
+    throw new Error('No AWS bucket specified for upload')
+  }
   await s3
     .putObject({
       Bucket: bucket,
@@ -74,6 +80,7 @@ type TaskRunResult = {
   fileName: string
   dumpTimeSec: number
   uploadTimeSec: number
+  uploadPath: string
   fileSizeMB: string
 }
 
@@ -85,6 +92,7 @@ export const runTask = async (
 
   const dateSuffix = getDateSuffix()
   const taskFolder = join(dumpsDir, [task.name, dateSuffix].join('_'))
+  let uploadPath = ''
   for await (const dump of task.dumps) {
     await runDump(dump, taskFolder)
   }
@@ -105,8 +113,13 @@ export const runTask = async (
     }
     if (uploadConfig.bucket) {
       const startTime = new Date()
-      await uploadFile(zipFile, uploadConfig)
+      await uploadFile(zipFile, {
+        ...uploadConfig,
+        folder: joinPath([uploadConfig.folder, task.name])
+      })
       uploadTimeSec = getDiffSec(startTime)
+      uploadPath = joinPath([uploadConfig.bucket, uploadConfig.folder])
+
       if (uploadConfig.removeAfterUpload !== false) {
         await fs.remove(taskFolder)
         await fs.remove(zipFile)
@@ -117,6 +130,7 @@ export const runTask = async (
     fileName: zipFile,
     dumpTimeSec,
     uploadTimeSec,
+    uploadPath,
     fileSizeMB
   }
 }
@@ -138,14 +152,21 @@ export const sendNotification = async (
       return [
         wrapP(`Dump completed in ${result.dumpTimeSec} sec`),
         wrapP(`File  ${result.fileName}, size: ${result.fileSizeMB} MB`),
-        wrapP(`Upload completed in ${result.uploadTimeSec} sec`)
+        result.uploadPath
+          ? wrapP(
+              `Upload to ${result.uploadPath} completed in ${
+                result.uploadTimeSec
+              } sec`
+            )
+          : ''
       ].join('')
     }
     if (error) hasError = true
+    const taskName = task.name
     return (
       html +
       wrapP(
-        `<b>Task ${task.name} completed` +
+        `<b>Task ${taskName} completed` +
           (error ? ' with error' + error.toString() : '.') +
           '</b>'
       ) +
@@ -185,11 +206,12 @@ const runBackupTasks = async (tasks: BackupTaskConfig[], config: Config) => {
   const completed: CompletedTasks = []
   if (tasks) {
     for await (const task of tasks) {
+      const taskName = task.name
       try {
         if (!task.dumps) {
           throw new Error('No tasks dump options')
         }
-        console.log(`Running backup task ${task.name}.`)
+        console.log(`Running backup task ${taskName}.`)
         const result = await runTask(task, config)
         const time = result.dumpTimeSec + result.uploadTimeSec
         console.log(`Backup task ${task.name} completed in ${time} sec.`)
@@ -209,6 +231,10 @@ const runBackupTasks = async (tasks: BackupTaskConfig[], config: Config) => {
 export const runConfig = async (config: Config) => {
   console.log('MongoDB Backup Service.')
 
+  if (config.tasks) {
+    await runBackupTasks(config.tasks, config)
+  }
+
   if (config.jobs) {
     for (const job of config.jobs) {
       console.log('Configuring backup scheduled job to run on', job.schedule)
@@ -217,9 +243,5 @@ export const runConfig = async (config: Config) => {
         runBackupTasks(job.tasks, config)
       })
     }
-  }
-
-  if (config.tasks) {
-    await runBackupTasks(config.tasks, config)
   }
 }

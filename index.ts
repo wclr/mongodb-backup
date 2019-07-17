@@ -19,14 +19,20 @@ export type NotificationConfig = {
 }
 
 export type UploadConfig = {
-  bucket: string
+  bucket?: string
   folder?: string
   awsConfig?: AWSConfig
+  /**
+   * Default true
+   *
+   * @type {boolean}
+   */
   removeAfterUpload?: boolean
 }
 
 export type BackupTaskConfig = {
   name: string
+  desc?: string
   dumps: MongoDumpOptions[]
   upload?: UploadConfig | false
 }
